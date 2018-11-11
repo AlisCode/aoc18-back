@@ -1,13 +1,12 @@
 use reqwest::Client;
+use rocket::response::{Flash, Redirect};
 use rocket::State;
 use state::global_config::GlobalConfig;
-use rocket::response::{Flash, Redirect};
 
 /// Handles callback URL from Github's OAUTH Server
 /// code: given by github, is the API user code that we can transform to an access_token
 #[get("/github?<code>")]
 pub fn cb_login_github(code: String, config: State<GlobalConfig>) -> Flash<Redirect> {
-
     // Gets the Github configuration
     let github_config = config.borrow_github_config();
 
@@ -26,43 +25,42 @@ pub fn cb_login_github(code: String, config: State<GlobalConfig>) -> Flash<Redir
         .send();
 
     // Create a reply from the given Github access token
-    let reply: GithubAuthReply =
-        match result_acces_token {
-            Ok(mut res) => {
-                let access_token_response: Result<AccessTokenResponse, _> = res.json();
+    let reply: GithubAuthReply = match result_acces_token {
+        Ok(mut res) => {
+            let access_token_response: Result<AccessTokenResponse, _> = res.json();
 
-                match access_token_response {
-                    Ok(response) => {
-                        GithubAuthReply {
-                            success: true,
-                            message: response.access_token,
-                        }
-                    }
-                    _ => GithubAuthReply {
-                        success: false,
-                        message: "Error contacting Github".into(),
-                    },
-                }
+            match access_token_response {
+                Ok(response) => GithubAuthReply {
+                    success: true,
+                    message: response.access_token,
+                },
+                _ => GithubAuthReply {
+                    success: false,
+                    message: "Error contacting Github".into(),
+                },
             }
-            _ => GithubAuthReply {
-                success: false,
-                message: "Github's server did not respond".into(),
-            }
-        };
+        }
+        _ => GithubAuthReply {
+            success: false,
+            message: "Github's server did not respond".into(),
+        },
+    };
 
     let redirect_to: String = format!("{}", github_config.get_redirect());
 
     // We either failed or success to disconnect, so we Flash the client with a cookie that will
     // be parsed on the front-end part.
     match reply.success {
-        true => Flash::success(
+        true => Flash::new(
             Redirect::to(redirect_to),
+            "auth_success",
             reply.message,
         ),
-        false => Flash::error(
+        false => Flash::new(
             Redirect::to(redirect_to),
+            "auth_failed",
             reply.message,
-        )
+        ),
     }
 }
 
