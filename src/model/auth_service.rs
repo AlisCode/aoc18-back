@@ -1,6 +1,6 @@
 use db::DatabaseConn;
-use model::user::{User, InsertUser};
 use diesel::prelude::*;
+use model::user::{InsertUser, User};
 
 #[derive(Queryable)]
 pub struct AuthProvider<'a> {
@@ -25,45 +25,47 @@ impl AuthService {
     }
 
     /// Consumes the service to get the user information, or create it in the database
-    pub fn get_user(self, db: &diesel::SqliteConnection) -> Result<User, &str> {
+    pub fn execute(self, db: &diesel::SqliteConnection) -> Result<User, String> {
         use schema::users;
 
         // Extracts data from the service
-        let new_username: String = self.username.ok_or("No username given")?;
-        let new_auth_service: i32 = self.id_auth_service.ok_or("No auth service given")?;
-        let new_token: String = self.token.ok_or("No token given")?;
+        let new_username: String = self.username.ok_or(format!("No username given"))?;
+        let new_auth_service: i32 = self
+            .id_auth_service
+            .ok_or(format!("No auth service given"))?;
+        let new_token: String = self.token.ok_or(format!("No token given"))?;
 
         // Checks that the username/auth_provider combination isn't already existing in database,
         // Which would mean that an user has already authenticated using this username
-        let existing_users: Result<Vec<User>, _> = users::table
+        let existing_users: Option<Vec<User>> = users::table
             .filter(users::username.eq(&new_username))
             .filter(users::auth_provider.eq(&new_auth_service))
-            .load::<User>(db);
+            .load::<User>(db)
+            .ok();
 
         match existing_users {
             // Returns the existing user
-            Some(list) if list.len() >= 1 => {
-                let user = list.first().unwrap();
-                Err("failed")
+            Some(ref list) if list.len() >= 1 => {
+                let user: &User = list.first().unwrap();
+                Ok((*user).clone())
             }
             // Or create one :)
             _ => {
                 let new_user = InsertUser::new(new_username, new_auth_service, new_token);
                 let inserted_user = diesel::insert_into(users::table)
                     .values(&new_user)
-                    .execute(db)
-                    .ok();
+                    .execute(db);
 
                 match inserted_user {
-                    Some(_) => Ok(User::new_from_inserted(new_user)),
-                    _ => Err("Failed to create a new user")
+                    Ok(_) => Ok(User::new_from_inserted(new_user)),
+                    Err(e) => Err(format!("{}", e)),
                 }
             }
         }
     }
 
     /// Supposed to return the ID of the `AuthProvider`
-    pub fn with_auth_service_id(mut self, id: i32) -> Self {
+    pub fn with_auth_service_id(self, id: i32) -> Self {
         AuthService {
             id_auth_service: Some(id),
             ..self
@@ -71,7 +73,7 @@ impl AuthService {
     }
 
     /// Sets the external token of the user being created
-    pub fn set_token(mut self, token: String) -> Self {
+    pub fn with_token(self, token: String) -> Self {
         AuthService {
             token: Some(token),
             ..self
@@ -79,10 +81,72 @@ impl AuthService {
     }
 
     /// Specifies the username of the user to create / authenticate
-    pub fn with_username(mut self, username: String) -> Self {
+    pub fn with_username(self, username: String) -> Self {
         AuthService {
             username: Some(username),
             ..self
         }
     }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::AuthService;
+    use super::User;
+    use db::TestDatabase;
+    use rocket::http::Status;
+    use rocket::local::Client;
+    use rocket::Rocket;
+
+    #[get("/test_user/<username>/<auth_provider>/<ext_token>")]
+    fn test_user(
+        username: String,
+        auth_provider: i32,
+        ext_token: String,
+        db: TestDatabase,
+    ) -> String {
+        let user: Result<User, String> = AuthService::new()
+            .with_username(username)
+            .with_auth_service_id(auth_provider)
+            .with_token(ext_token)
+            .execute(&db);
+
+        match user {
+            Ok(user) => "Successfully logged in".into(),
+            Err(e) => e.into(),
+        }
+    }
+
+    fn test_rocket() -> Rocket {
+        rocket::ignite()
+            .mount("/", routes![test_user])
+            .attach(TestDatabase::fairing())
+    }
+
+    #[test]
+    pub fn create_user() {
+        let rocket: Rocket = test_rocket();
+        let client: Client = Client::new(rocket).expect("Valid Rocket instance");
+        let mut response = client.get("/test_user/test_user/1/test_token").dispatch();
+
+        // Server should repond OK, creating the user
+        assert_eq!(response.status(), Status::Ok);
+        assert_eq!(
+            response.body_string(),
+            Some("Successfully logged in".into())
+        );
+
+        // Sending the same request should successfully connect the user
+        let mut response = client.get("/test_user/test_user/1/test_token").dispatch();
+
+        // Server should repond OK, and return the user
+        assert_eq!(response.status(), Status::Ok);
+        assert_eq!(
+            response.body_string(),
+            Some("Successfully logged in".into())
+        );
+
+        // TODO: test - Total number of user should still be one
+    }
+
 }

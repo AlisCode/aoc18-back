@@ -1,8 +1,8 @@
-use schema::users;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
+use schema::users;
 
-#[derive(Queryable, Clone)]
+#[derive(Queryable, Clone, Serialize, Deserialize)]
 /// Describes a user as present in the database
 pub struct User {
     /// The unique ID of the user
