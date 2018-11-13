@@ -1,8 +1,8 @@
+use state::database_config::DatabaseConfig;
+use state::github::GithubAuth;
 use std::fs::File;
 use std::io::Read;
 use toml::de::from_slice;
-use state::github::GithubAuth;
-use state::database_config::DatabaseConfig;
 
 #[derive(Deserialize, Debug)]
 pub struct GlobalConfig {
@@ -13,9 +13,12 @@ pub struct GlobalConfig {
 impl GlobalConfig {
     /// Loads the configuration, searching for a valid TOML file in config/config.toml
     pub fn load() -> GlobalConfig {
-        let mut config_file = File::open("config/config.toml").expect("No config file in config/config.toml");
+        let mut config_file =
+            File::open("config/config.toml").expect("No config file in config/config.toml");
         let mut buf: Vec<u8> = Vec::new();
-        config_file.read_to_end(&mut buf).expect("Failed to read config file");
+        config_file
+            .read_to_end(&mut buf)
+            .expect("Failed to read config file");
         from_slice(&buf).expect("Config file not formatted correctly")
     }
 
@@ -25,5 +28,7 @@ impl GlobalConfig {
     }
 
     /// Gets a borrow to the database part of the configuration
-    pub fn borrow_database_config(&self) -> &DatabaseConfig { &self.database }
+    pub fn borrow_database_config(&self) -> &DatabaseConfig {
+        &self.database
+    }
 }

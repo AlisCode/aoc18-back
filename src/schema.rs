@@ -17,7 +17,4 @@ table! {
 
 joinable!(users -> authprovider (auth_provider));
 
-allow_tables_to_appear_in_same_query!(
-    authprovider,
-    users,
-);
+allow_tables_to_appear_in_same_query!(authprovider, users,);

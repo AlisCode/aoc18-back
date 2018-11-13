@@ -82,7 +82,7 @@ pub fn cb_login_github(
             let username: String = format!("{}", value["login"])
                 .trim()
                 .chars()
-                .filter(|c| c != "\"")
+                .filter(|&c| c != '\"')
                 .collect();
 
             // Starts the authentication service with our params
