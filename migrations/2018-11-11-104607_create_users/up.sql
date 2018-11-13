@@ -14,5 +14,5 @@ CREATE TABLE users (
     token TEXT NOT NULL,
     auth_provider INTEGER NOT NULL,
     ext_token TEXT NOT NULL,
-    FOREIGN KEY(auth_provider) REFERENCES autprovider(id)
+    FOREIGN KEY(auth_provider) REFERENCES authprovider(id)
 );
