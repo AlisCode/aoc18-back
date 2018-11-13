@@ -22,6 +22,7 @@ extern crate toml;
 
 pub mod db;
 pub mod login;
+pub mod model;
 pub mod schema;
 pub mod state;
 
