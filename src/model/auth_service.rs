@@ -1,4 +1,3 @@
-use db::DatabaseConn;
 use diesel::prelude::*;
 use model::user::{InsertUser, User};
 
@@ -112,7 +111,7 @@ pub mod tests {
             .execute(&db);
 
         match user {
-            Ok(user) => "Successfully logged in".into(),
+            Ok(_) => "Successfully logged in".into(),
             Err(e) => e.into(),
         }
     }
