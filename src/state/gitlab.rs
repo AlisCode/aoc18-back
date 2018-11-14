@@ -6,6 +6,8 @@ pub struct GitlabAuth {
     secret: String,
     /// Address to redirect to after a login attempt
     redirect: String,
+    /// Address to redirect for the API
+    redirect_api: String,
 }
 
 impl GitlabAuth {
@@ -22,5 +24,10 @@ impl GitlabAuth {
     /// Gets the address to redirect to after a login attempt
     pub fn get_redirect(&self) -> &str {
         &self.redirect
+    }
+
+    /// Gets the API address to redirect to after a login attempt
+    pub fn get_redirect_api(&self) -> &str {
+        &self.redirect_api
     }
 }

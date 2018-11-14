@@ -29,31 +29,29 @@ pub fn cb_login_gitlab(
             gitlab_config.get_client_id().into(),
             gitlab_config.get_secret().into(),
             code,
-            gitlab_config.get_redirect().into(),
+            gitlab_config.get_redirect_api().into(),
         ))
         .send();
 
     // Create a reply from the given Gitlab access token
     let reply: GitlabAuthReply = match result_acces_token {
         Ok(mut res) => {
-            let access_token_response: Value = res.json().unwrap();
-
-            GitlabAuthReply {
-                success: false,
-                message: format!("{:?}", access_token_response),
-            }
-            /*
+            let access_token_response: Result<Value, _> = res.json();
             match access_token_response {
                 Ok(response) => GitlabAuthReply {
                     success: true,
-                    message: response.access_token,
+                    message: response["access_token"]
+                        .to_string()
+                        .trim()
+                        .chars()
+                        .filter(|&c| c != '\"')
+                        .collect(),
                 },
                 _ => GitlabAuthReply {
                     success: false,
                     message: "Error contacting Gitlab".into(),
                 },
             }
-            */
         }
         _ => GitlabAuthReply {
             success: false,
@@ -87,7 +85,8 @@ pub fn cb_login_gitlab(
             let value: Value = res.json().expect("Failed to read JSON");
 
             // Gets the username; Trims it and removes quotes because Gitlab's username format is weird
-            let username: String = format!("{}", value["username"])
+            let username: String = value["username"]
+                .to_string()
                 .trim()
                 .chars()
                 .filter(|&c| c != '\"')
