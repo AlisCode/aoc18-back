@@ -44,6 +44,12 @@ fn main() {
         .manage(config)
         .attach(DatabaseConn::fairing())
         .mount("/", routes![index])
-        .mount("/login", routes![login::github::cb_login_github])
+        .mount(
+            "/login",
+            routes![
+                login::github::cb_login_github,
+                login::gitlab::cb_login_gitlab
+            ],
+        )
         .launch();
 }

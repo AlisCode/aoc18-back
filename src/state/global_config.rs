@@ -1,5 +1,6 @@
 use state::database_config::DatabaseConfig;
 use state::github::GithubAuth;
+use state::gitlab::GitlabAuth;
 use std::fs::File;
 use std::io::Read;
 use toml::de::from_slice;
@@ -7,6 +8,7 @@ use toml::de::from_slice;
 #[derive(Deserialize, Debug)]
 pub struct GlobalConfig {
     github: GithubAuth,
+    gitlab: GitlabAuth,
     database: DatabaseConfig,
 }
 
@@ -25,6 +27,11 @@ impl GlobalConfig {
     /// Gets a borrow to the github part of the configuration
     pub fn borrow_github_config(&self) -> &GithubAuth {
         &self.github
+    }
+
+    /// Gets a borrow to the gitlab part of the configuration
+    pub fn borrow_gitlab_config(&self) -> &GitlabAuth {
+        &self.gitlab
     }
 
     /// Gets a borrow to the database part of the configuration
