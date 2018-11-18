@@ -9,6 +9,7 @@ extern crate rand;
 extern crate rocket;
 #[macro_use]
 extern crate rocket_contrib;
+extern crate rocket_cors;
 
 extern crate reqwest;
 
@@ -27,6 +28,8 @@ pub mod schema;
 pub mod state;
 
 use db::DatabaseConn;
+use rocket::http::Method;
+use rocket_cors::{AllowedHeaders, AllowedOrigins};
 use state::global_config::GlobalConfig;
 
 #[get("/")]
@@ -35,14 +38,30 @@ fn index() -> &'static str {
 }
 
 fn main() {
+    // Load config
     println!("Loading config ...");
     let config: GlobalConfig = GlobalConfig::load();
     println!("Config loaded successfully !");
+
+    // Setup CORS Options
+    let (allowed_origins, failed_origins) = AllowedOrigins::some(&[
+        "http://192.168.1.1:8080",
+        "http://192.168.1.1:8000",
+        "http://localhost",
+    ]);
+    let cors_options = rocket_cors::Cors {
+        allowed_origins: allowed_origins,
+        allowed_methods: vec![Method::Get].into_iter().map(From::from).collect(),
+        allowed_headers: AllowedHeaders::some(&["Authorization", "Accept"]),
+        allow_credentials: true,
+        ..Default::default()
+    };
 
     println!("Launching the server ...");
     rocket::ignite()
         .manage(config)
         .attach(DatabaseConn::fairing())
+        .attach(cors_options)
         .mount("/", routes![index])
         .mount(
             "/login",
@@ -51,5 +70,6 @@ fn main() {
                 login::gitlab::cb_login_gitlab
             ],
         )
+        .mount("/api", routes![model::user::get_username])
         .launch();
 }

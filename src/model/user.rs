@@ -1,8 +1,14 @@
+use db::DatabaseConn;
+use diesel::prelude::*;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
+use rocket::http::Cookie;
+use rocket::http::Status;
+use rocket::request::{FromRequest, Request};
+use rocket::Outcome;
 use schema::users;
 
-#[derive(Queryable, Clone, Serialize, Deserialize)]
+#[derive(Queryable, Clone, Serialize, Deserialize, Debug)]
 /// Describes a user as present in the database
 pub struct User {
     /// The unique ID of the user
@@ -29,6 +35,21 @@ impl User {
             token: insert_user.token,
             auth_provider: insert_user.auth_provider,
             ext_token: insert_user.ext_token,
+        }
+    }
+
+    pub fn find_by_token(token: String, db: &diesel::SqliteConnection) -> Result<Self, ()> {
+        let queried = users::table
+            .filter(users::token.eq(token))
+            .load::<Self>(db)
+            .ok();
+
+        match queried {
+            Some(ref list) if list.len() >= 1 => {
+                let user: &User = list.first().unwrap();
+                Ok((*user).clone())
+            }
+            _ => Err(()),
         }
     }
 }
@@ -62,4 +83,58 @@ impl InsertUser {
             ext_token,
         }
     }
+}
+
+pub struct APIUser {
+    pub id: i32,
+    pub auth_provider: i32,
+    pub username: String,
+}
+
+impl APIUser {
+    pub fn new_from_user(user: User) -> Self {
+        APIUser {
+            id: user.id.unwrap(),
+            auth_provider: user.auth_provider,
+            username: user.username,
+        }
+    }
+}
+
+impl<'a, 'r> FromRequest<'a, 'r> for APIUser {
+    type Error = &'a str;
+
+    fn from_request(request: &'a Request<'r>) -> rocket::request::Outcome<Self, Self::Error> {
+        let db = request.guard::<DatabaseConn>();
+        match db {
+            Outcome::Failure(_) => {
+                return Outcome::Failure((
+                    Status::InternalServerError,
+                    "Failed to connect to database",
+                ))
+            }
+            Outcome::Forward(_) => {
+                return Outcome::Failure((Status::InternalServerError, "Got forwarded on DB query"))
+            }
+            _ => (),
+        };
+
+        let api_token: String = request
+            .cookies()
+            .get("api_token")
+            .unwrap_or(&Cookie::new("api_token", ""))
+            .value()
+            .into();
+
+        let db: DatabaseConn = db.unwrap();
+        match User::find_by_token(api_token, &db) {
+            Ok(user) => Outcome::Success(APIUser::new_from_user(user)),
+            Err(_) => Outcome::Failure((Status::NotFound, "No user found")),
+        }
+    }
+}
+
+#[get("/username")]
+pub fn get_username(api_user: APIUser) -> String {
+    api_user.username
 }
